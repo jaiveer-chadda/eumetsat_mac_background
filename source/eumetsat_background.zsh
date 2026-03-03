@@ -3,10 +3,9 @@
 
 eumetsat_bg::download_image() {
 
-  local _self_location="${CS}/x_Automation/Mac Background/EUMETSAT"
-  local _resources_dir="${_self_location}/resources"
+  local _project_dir="${CS}/x_Automation/Mac Background/EUMETSAT"
+  local _resources_dir="${_project_dir}/resources"
   local _target_file="${_resources_dir}/most_recent_img.png"
-
 
   local domain='https://view.eumetsat.int/geoserver/ows'
   
