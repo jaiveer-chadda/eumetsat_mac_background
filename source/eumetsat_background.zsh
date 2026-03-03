@@ -1,11 +1,25 @@
 #!/usr/bin/env zsh
 
+# will run every ~10 mins
+eumetsat_bg::main() {
+
+  local _seconds_in_10_mins=$(( 10 * 60 ))
+
+  local current_unix_time="$( date '+%s' )"
+  local img_last_get_time=''
+
+  
+  eumetsat_bg::download_image
+
+}
+
+
 
 eumetsat_bg::download_image() {
 
   local _project_dir="${CS}/x_Automation/Mac Background/EUMETSAT"
-  local _resources_dir="${_project_dir}/resources"
-  local _target_file="${_resources_dir}/most_recent_img.png"
+  local _images_dir="${_project_dir}/resources"
+  local _recent_img_fp="${_images_dir}/most_recent_img.png"
 
   local domain='https://view.eumetsat.int/geoserver/ows'
   
@@ -35,7 +49,7 @@ eumetsat_bg::download_image() {
   )
 
 
-  curl "${domain}?${(j:&:)arguments}" > "${_target_file}"
+  curl "${domain}?${(j:&:)arguments}" > "${_recent_img_fp}"
 
 }
 
