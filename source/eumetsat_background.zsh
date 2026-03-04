@@ -1,25 +1,34 @@
 #!/usr/bin/env zsh
 
+
 # will run every ~10 mins
 eumetsat_bg::main() {
 
-  local _seconds_in_10_mins=$(( 10 * 60 ))
+  local _project_root="${CS}/x_Automation/Mac Background/EUMETSAT"
+  local _environ_dir="${_project_root}/environment"
+  local _time_last_run_file="${_environ_dir}/time_last_run.txt"
 
-  local current_unix_time="$( date '+%s' )"
-  local img_last_get_time=''
+  local _secs_in_10_mins=$(( 10 * 60 ))
 
+  local current_time="$( date '+%s' )"
+  local time_last_run="$( cat "${_time_last_run_file}" )"
+
+  # if it's been < 10 mins since the last run, don't re-run it
+  (( current_time - time_last_run < _secs_in_10_mins )) && return 1
   
+  # download the image and save it to ./images/most_recent_img.png
   eumetsat_bg::download_image
-
+  # record current time in environment file
+  echo "${current_time}" > "${_time_last_run_file}"
 }
 
 
 
 eumetsat_bg::download_image() {
 
-  local _project_dir="${CS}/x_Automation/Mac Background/EUMETSAT"
-  local _images_dir="${_project_dir}/resources"
-  local _recent_img_fp="${_images_dir}/most_recent_img.png"
+  local _project_root="${CS}/x_Automation/Mac Background/EUMETSAT"
+  local _images_dir="${_project_root}/images"
+  local _recent_img_file="${_images_dir}/most_recent_img.png"
 
   local domain='https://view.eumetsat.int/geoserver/ows'
   
@@ -27,15 +36,13 @@ eumetsat_bg::download_image() {
   local request='GetMap'
   local version='1.3.0'
   
-  local -a layers_arr=( 'mtg_fd:rgb_geocolour' )
+  local -a layers=( 'mtg_fd:rgb_geocolour' )
   
   local format='image/png'
   local crs='EPSG:4326'
   
   local -a bounding_box=( -82 -82 82 82 )
-  
-  local -A _dims=( [width]=800 [height]=800 )
-  local dimensions="width=${_dims[width]}&height=${_dims[height]}"
+  local -A dimensions=( [width]=800 [height]=800 )
 
   local -a arguments=( 
     "service=${service}"
@@ -45,11 +52,11 @@ eumetsat_bg::download_image() {
     "format=${format}"
     "crs=${crs}"
     "bbox=${(j:,:)bounding_box}"
-    "${dimensions}"
+    "width=${dimensions[width]}"
+    "height=${dimensions[height]}"
   )
 
-
-  curl "${domain}?${(j:&:)arguments}" > "${_recent_img_fp}"
+  curl "${domain}?${(j:&:)arguments}" > "${_recent_img_file}"
 
 }
 
