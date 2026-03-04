@@ -1,63 +1,91 @@
 #!/usr/bin/env zsh
 
+
+eumetsat_bg::init() {
+
+  # ————— Return Codes ——————
+
+  export EB_RET_CODE_TOO_EARLY=2
+  export EB_RET_CODE_DOWNLOAD_FAILED=3
+  export EB_RET_CODE_NO_NEW_IMG=4
+
+  # ————— Filepaths ——————
+
+  export EB_PROJECT_ROOT="${CS}/x_Automation/Mac Background/EUMETSAT"
+
+  export EB_ENVIRONMENT_DIR="${EB_PROJECT_ROOT}/environment"
+  export EB_IMAGES_DIR="${EB_PROJECT_ROOT}/images"
+
+  export EB_ACTIVE_IMG_UPDATED_FP="${EB_ENVIRONMENT_DIR}/active_img_updated"
+
+  export EB_ACTIVE_IMG_FP="${EB_IMAGES_DIR}/active_img.png"
+  export EB_TEMP_IMG_FP="${EB_IMAGES_DIR}/_temp_img.png"
+
+  # ————— Time ——————
+
+  export EB_10_MINS_IN_SECS=$(( 10 * 60 ))
+
+  export EB_CURRENT_TIME="$( date '+%s' )"
+  export EB_ACTIVE_IMG_UPDATED="$( cat "${EB_ACTIVE_IMG_UPDATED_FP}" )"
+  export EB_TIME_SINCE_LAST_UPDATE=$(( EB_CURRENT_TIME - EB_ACTIVE_IMG_UPDATED ))
+
+  export EB_ACTIVE_IMG_BIRTH="$( stat -f %B "${EB_ACTIVE_IMG_FP}" )"
+  # export EB_TEMP_IMG_BIRTH="$( stat -f %B "${EB_TEMP_IMG_FP}" )"
+
+}
+
+eumetsat_bg::deinit() {
+  unset \
+    EB_RET_CODE_TOO_EARLY   EB_RET_CODE_DOWNLOAD_FAILED                     \
+    EB_RET_CODE_NO_NEW_IMG  EB_PROJECT_ROOT             EB_ENVIRONMENT_DIR  \
+    EB_IMAGES_DIR           EB_ACTIVE_IMG_UPDATED_FP    EB_ACTIVE_IMG_FP    \
+    EB_TEMP_IMG_FP          EB_10_MINS_IN_SECS          EB_CURRENT_TIME     \
+    EB_ACTIVE_IMG_UPDATED   EB_TIME_SINCE_LAST_UPDATE   EB_ACTIVE_IMG_BIRTH \
+    EB_TEMP_IMG_BIRTH
+}
+
+
+# ——————————————————————————————————————————————————————————————————————————— #
+
+eumetsat_bg() {
+  eumetsat_bg::init
+  eumetsat_bg::main "${@}"
+  local -i ret_code="${?}"
+  eumetsat_bg::deinit
+  return $ret_code
+}
+
 # ——————————————————————————————————————————————————————————————————————————— #
 
 # will run every ~10 mins, since a new photo is uploaded every ~10 mins
 eumetsat_bg::main() {
 
-  local -i _ret_code_too_early=2
-  local -i _ret_code_download_failed=3
-  local -i _ret_code_no_new_img=4
-
-  # ———————————————————————————————————————————————— #
-
-  local _project_root="${CS}/x_Automation/Mac Background/EUMETSAT"
-  
-  local _environ_dir="${_project_root}/environment"
-  local _images_dir="${_project_root}/images"
-
-  local _active_img_updated_fp="${_environ_dir}/active_img_updated"
-
-  local _active_img_fp="${_images_dir}/active_img.png"
-  local _temp_img_fp="${_images_dir}/_temp_img.png"
-
-  local -i _secs_in_10_mins=$(( 10 * 60 ))
-
-  # ———————————————————————————————————————————————— #
-
   local -i   do_force=0
   local -i do_verbose=0
-  [[ $1 =~ '-f|--force'   ]] && {               do_force=1; shift; }
-  [[ $1 =~ '-v|--verbose' ]] && { do_verbose=1;             shift; }
-  [[ $1 =~ '-vf|-fv'      ]] && { do_verbose=1; do_force=1; shift; }
+  [[ $1 =~  '^-f$|^--force$'   ]] && {               do_force=1; shift; }
+  [[ $1 =~  '^-v$|^--verbose$' ]] && { do_verbose=1;             shift; }
+  [[ $1 =~ '^-vf$|^-fv$'       ]] && { do_verbose=1; do_force=1; shift; }
 
   (( do_verbose )) && {
     (( do_force )) \
       && echo 'do_force   : true' \
       || echo 'do_force   : false'
     echo "do_verbose : true\n"
-  }
-
-  local -i current_time="$( date '+%s' )"
-  local -i active_img_updated="$( cat "${_active_img_updated_fp}" )"
-  local -i time_since_last_update=$(( current_time - active_img_updated ))
-
-  (( do_verbose )) && {
-    echo "current time           : ${current_time}"
-    echo "active img update time : ${active_img_updated}"
-    echo "secs since last update : ${time_since_last_update}\n"
+    echo "current time           : ${EB_CURRENT_TIME}"
+    echo "active img update time : ${EB_ACTIVE_IMG_UPDATED}"
+    echo "secs since last update : ${EB_TIME_SINCE_LAST_UPDATE}\n"
   }
 
   # if it's been < 10 mins since the last time the bg was updated, don't run
   #  except if --force has been passed
-  (( time_since_last_update < _secs_in_10_mins && ! do_force )) && {
+  (( EB_TIME_SINCE_LAST_UPDATE < EB_10_MINS_IN_SECS && ! do_force )) && {
     (( do_verbose )) && 
       echo "\e[31mNot enough time since last update\e[0m; exiting"
-    return $_ret_code_too_early
+    return $EB_RET_CODE_TOO_EARLY
   }
 
   (( do_verbose )) && \
-    echo "\e[34m>= 10 mins since last update (or --force set)\e[0m; continuing\n"
+    echo "\e[34m>= 10 mins since updated (or --force is set)\e[0m; continuing\n"
 
   # ———————————————————————————————————————————————— #
 
@@ -65,44 +93,40 @@ eumetsat_bg::main() {
   eumetsat_bg::download_image $do_verbose || {
     (( do_verbose )) && echo "\e[31mDownload Failed\e[0m; exiting"
     # if it fails to download, return != 0
-    return $_ret_code_download_failed
+    return $EB_RET_CODE_DOWNLOAD_FAILED
   }
-
-  (( do_verbose )) && echo "\e[34mDownload Succeeded\e[0m; continuing\n"
-
-  local -i active_img_birth="$( stat -f %B "${_active_img_fp}" )"
-  local -i temp_img_birth="$( stat -f %B "${_temp_img_fp}" )"
+  
+  export EB_TEMP_IMG_BIRTH="$( stat -f %B "${EB_TEMP_IMG_FP}" )"
 
   (( do_verbose )) && {
-    echo "active img birth time  : ${current_time}"
-    echo "downloaded img birth   : ${active_img_updated}"
+    echo "\e[34mDownload Succeeded\e[0m; continuing\n"
+    echo "active img birth time  : ${EB_CURRENT_TIME}"
+    echo "downloaded img birth   : ${EB_ACTIVE_IMG_UPDATED}"
   }
 
   # if the img we just dloded has the same creation time as the one we alr have
   #  then delete the temp img, and return != 0
-  (( active_img_birth == temp_img_birth )) && {
+  (( EB_ACTIVE_IMG_BIRTH == EB_TEMP_IMG_BIRTH )) && {
     (( do_verbose )) && 
       echo "\e[31mImages have same birth time\e[0m; deleting temp img & exiting"
-    command rm "${_temp_img_fp}"
-    return $_ret_code_no_new_img
+    command rm "${EB_TEMP_IMG_FP}"
+    return $EB_RET_CODE_NO_NEW_IMG
   }
 
   (( do_verbose )) && {
     echo "\e[34mImages do not have same birth time\e[0m; continuing\n"
-    echo 'Moving _temp_img.png -> active_img.png'
+    echo 'Moving _temp_img.png -> active_img.png\n'
   }
 
-  mv "${_temp_img_fp}" "${_active_img_fp}"
+  mv "${EB_TEMP_IMG_FP}" "${EB_ACTIVE_IMG_FP}"
 
   (( do_verbose )) && {
-    echo "Setting active image birth time to ${temp_img_birth}"
-    echo "Setting active img updated time to ${current_time}"
+    echo "Setting active image birth time to ${EB_TEMP_IMG_BIRTH}"
+    echo "Setting active img updated time to ${EB_CURRENT_TIME}"
   }
 
-  echo "${temp_img_birth}" > "${_active_img_birth_fp}"
-
   # if everything succeeds, record current time in environment file
-  echo "${current_time}" > "${_active_img_updated_fp}"
+  echo "${EB_CURRENT_TIME}" > "${EB_ACTIVE_IMG_UPDATED_FP}"
 }
 
 
